@@ -1,0 +1,9 @@
+[package]
+name = "mak"
+version = "0.1.0"
+authors = ["Paulo Lieuthier <paulolieuthier@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+nom = "5"
+num-traits = "0.2"
