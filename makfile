@@ -1,0 +1,8 @@
+import "xalala"
+
+x = "value"
+
+task taskname:
+    yo = "s"
+    print(yo)
+    print(x)
