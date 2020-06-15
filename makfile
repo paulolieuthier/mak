@@ -1,7 +1,11 @@
+# actually importing not working yet
 import "xalala"
 
+# this is a constant
+# another comment line
 x = "value"
 
+# this is a task
 task taskname:
     yo = "s"
     print(yo)

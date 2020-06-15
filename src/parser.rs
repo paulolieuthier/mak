@@ -34,11 +34,15 @@ fn test_parse_proper() {
     assert_eq!(parse(""), Ok(ast::Ast(vec![])));
     assert_eq!(parse(
 r#"
+# imports
 import "xalala"
 import "xalalo"
 
+# constant
+# another comment line
 x = "value"
 
+# task
 task task1:
     print(x)
     yo = 123
@@ -67,7 +71,28 @@ Ok(ast::Ast(vec![
 }
 
 fn parse_toplevel(i: &str) -> ParserResult<ast::TopLevelExpr> {
-    delimited(space, alt((parse_toplevel_import, parse_toplevel_constant, parse_toplevel_task)), space)(i)
+    let (i, _) = parse_toplevel_comments(i)?;
+    let (i, _) = space(i)?;
+    let (i, toplevel) = alt((parse_toplevel_import, parse_toplevel_constant, parse_toplevel_task))(i)?;
+    let (i, _) = space(i)?;
+    Ok((i, toplevel))
+}
+
+#[test]
+fn test_parse_toplevel() {
+    assert_eq!(parse_toplevel("import \"xalala\""), Ok(("", ast::TopLevelExpr::Import("xalala"))));
+    assert_eq!(parse_toplevel("# comment 1\nimport \"xalala\""), Ok(("", ast::TopLevelExpr::Import("xalala"))));
+}
+
+fn parse_toplevel_comments(i: &str) -> ParserResult<&str> {
+    let (i, _) = opt(many0(preceded(tag("#"), terminated(not_line_ending, newline_or_eof))))(i)?;
+    Ok((i, ""))
+}
+
+#[test]
+fn test_parse_toplevel_comments() {
+    assert_eq!(parse_toplevel_comments("# comment 1\n"), Ok(("", "")));
+    assert_eq!(parse_toplevel_comments("# comment 1\n\n\n# comment 2"), Ok(("", "")));
 }
 
 fn parse_toplevel_import(i: &str) -> ParserResult<ast::TopLevelExpr> {
