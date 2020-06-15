@@ -7,6 +7,6 @@ x = "value"
 
 # this is a task
 task taskname:
-    yo = "s"
+    yo = 123
     print(yo)
     print(x)
