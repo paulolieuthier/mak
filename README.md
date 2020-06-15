@@ -19,3 +19,30 @@ $ mak taskname
 123
 value
 ```
+
+# TODO
+
+* String interpolation:
+```
+tast example:
+    x = 123
+    print("this is the value for x: #{x}")
+```
+
+* Support multiple, named arguments for built-in functions and return values:
+```
+task example:
+    x = ask(msg: "replicas: ", default: 1)
+    print(x)
+```
+
+* More built-in functions (`ask` to get user input, what else?)
+
+* Better integration with shellscript:
+```
+task example:
+    image = k get deploy #{deployment} -o json | jq '.spec.template.spec.containers[] | select(.name == "#{deployment}") | .image' cut -d: -f2
+    image = ask(msg: "New image for deploy: ", default: image)
+    ktmpl kubernetes/manifests/deployment.yml -p IMAGE "#{image}" | k apply -f -
+    print("Deployed!")
+```
