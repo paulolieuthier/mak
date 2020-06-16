@@ -2,7 +2,6 @@ use crate::ast;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::rc::Rc;
 
 #[derive(Clone, Copy)]
 enum Value<'a> {
@@ -46,35 +45,35 @@ struct ExecutionContext<'a> {
     variables: HashMap<&'a str, Value<'a>>,
 }
 
-pub fn new<'a>(ast: &'a ast::Ast<'a>) -> Result<Rc<RefCell<Interpreter<'a>>>, String> {
+pub fn new<'a>(ast: &'a ast::Ast<'a>) -> Result<RefCell<Interpreter<'a>>, String> {
     Interpreter::new(ast)
 }
 
 impl<'a> Interpreter<'a> {
-    pub fn new(prog: &'a ast::Ast<'a>) -> Result<Rc<RefCell<Interpreter<'a>>>, String> {
-        let interpreter = Rc::new(RefCell::new(Interpreter {
+    pub fn new(prog: &'a ast::Ast<'a>) -> Result<RefCell<Interpreter<'a>>, String> {
+        let interpreter = RefCell::new(Interpreter {
             constants: HashMap::new(),
             tasks: HashMap::new(),
             functions: HashMap::new(),
-        }));
+        });
 
         interpreter.borrow_mut().load(prog)?;
         interpreter.borrow_mut().functions.insert("print", Box::new(PrintFunction));
-        Ok(interpreter.clone())
+        Ok(interpreter)
     }
 
     pub fn run(&self, task: String) -> Result<(), String> {
         let task = self.tasks.get(&task[..]).ok_or(format!("task '{}' not found", task))?;
-        let context = Rc::new(RefCell::new(ExecutionContext { task, variables: HashMap::new() }));
-        self.run_task(context.clone())
+        let context = RefCell::new(ExecutionContext { task, variables: HashMap::new() });
+        self.run_task(context)
     }
 
-    fn run_task(&self, context: Rc<RefCell<ExecutionContext<'a>>>) -> Result<(), String> {
+    fn run_task(&self, context: RefCell<ExecutionContext<'a>>) -> Result<(), String> {
         let Task(statements) = context.borrow().task;
         for statement in *statements {
             let res = match statement {
-                ast::Statement::Assignment(ident, value) => self.run_task_assignment(context.clone(), &ident, &value),
-                ast::Statement::Call(ident, args) => self.run_task_call(context.clone(), &ident, &args)
+                ast::Statement::Assignment(ident, value) => self.run_task_assignment(&context, &ident, &value),
+                ast::Statement::Call(ident, args) => self.run_task_call(&context, &ident, &args)
             };
 
             if res.is_err() {
@@ -85,15 +84,15 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn run_task_assignment(&self, context: Rc<RefCell<ExecutionContext<'a>>>, ast::Ident(name): &ast::Ident<'a>, value: &ast::Value<'a>) -> Result<(), String> {
-        let value = self.load_value(Some(context.clone()), value)?;
+    fn run_task_assignment(&self, context: &RefCell<ExecutionContext<'a>>, ast::Ident(name): &ast::Ident<'a>, value: &ast::Value<'a>) -> Result<(), String> {
+        let value = self.load_value(Some(&context), value)?;
         context.borrow_mut().variables.insert(name, value);
         Ok(())
     }
 
-    fn run_task_call(&self, context: Rc<RefCell<ExecutionContext<'a>>>, ast::Ident(name): &ast::Ident<'a>, args: &Vec<ast::Value<'a>>) -> Result<(), String> {
+    fn run_task_call(&self, context: &RefCell<ExecutionContext<'a>>, ast::Ident(name): &ast::Ident<'a>, args: &Vec<ast::Value<'a>>) -> Result<(), String> {
         let function: &Box<dyn Function> = self.functions.get(name).ok_or(format!("function '{}' not defined", name))?;
-        let args: Result<Vec<_>, _> = args.iter().map(|arg| self.load_value(Some(context.clone()), arg)).collect();
+        let args: Result<Vec<_>, _> = args.iter().map(|arg| self.load_value(Some(context), arg)).collect();
         function.call(args?);
         Ok(())
     }
@@ -127,7 +126,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn load_value(&self, context: Option<Rc<RefCell<ExecutionContext<'a>>>>, value: &ast::Value<'a>) -> Result<Value<'a>, String> {
+    fn load_value(&self, context: Option<&RefCell<ExecutionContext<'a>>>, value: &ast::Value<'a>) -> Result<Value<'a>, String> {
         match value {
             ast::Value::Text(text) => Ok(Value::Text(text)),
             ast::Value::Number(number) => Ok(Value::Number(*number)),
@@ -135,7 +134,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn lookup_reference(&self, context: Option<Rc<RefCell<ExecutionContext<'a>>>>, ident: &'a str) -> Option<Value<'a>> {
+    fn lookup_reference(&self, context: Option<&RefCell<ExecutionContext<'a>>>, ident: &'a str) -> Option<Value<'a>> {
         // less magic here, please
         context.and_then(|c| Some(*c.borrow().variables.get(ident)?))
             .or_else(|| Some(*self.constants.get(ident)?))
