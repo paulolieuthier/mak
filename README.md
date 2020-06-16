@@ -46,3 +46,5 @@ task example:
     ktmpl kubernetes/manifests/deployment.yml -p IMAGE "#{image}" | k apply -f -
     print("Deployed!")
 ```
+
+* Better parsing error messages
