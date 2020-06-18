@@ -20,6 +20,10 @@ $ mak taskname
 value
 ```
 
+# Features
+
+* Built-in functions with named arguments
+
 # TODO
 
 * String interpolation:
@@ -29,7 +33,7 @@ tast example:
     print("this is the value for x: #{x}")
 ```
 
-* Support multiple, named arguments for built-in functions and return values:
+* Support built-in functions with return values:
 ```
 task example:
     x = ask(msg: "replicas: ", default: 1)

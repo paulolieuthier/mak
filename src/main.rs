@@ -1,6 +1,7 @@
 pub mod ast;
-pub mod parser;
+pub mod functions;
 pub mod interpreter;
+pub mod parser;
 
 use std::env;
 use std::fs;
@@ -16,7 +17,7 @@ fn main() -> Result<(), String> {
     let ast = parser::parse(&contents[..])?;
     let interpreter = interpreter::new(&ast)?;
     for task in env::args().skip(1) {
-        interpreter.borrow().run(task)?;
+        interpreter.borrow().run(&task[..])?;
     }
 
     Ok(())

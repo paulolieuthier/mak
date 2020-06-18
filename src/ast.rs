@@ -26,7 +26,19 @@ pub struct Task<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement<'a> {
     Assignment(Ident<'a>, Value<'a>),
-    Call(Ident<'a>, Vec<Value<'a>>),
+    Call(Ident<'a>, Args<'a>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Args<'a> {
+    Simple(Value<'a>),
+    Named(Vec<Arg<'a>>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Arg<'a> {
+    pub name: Ident<'a>,
+    pub value: Value<'a>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,6 +58,5 @@ impl<'a> Display for Value<'a> {
             Value::Number(number) => write!(f, "{}", number),
             Value::Reference(Ident(ident)) => write!(f, "{}", ident),
         }
-        
     }
 }
