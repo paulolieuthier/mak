@@ -1,7 +1,6 @@
 use crate::ast;
 use crate::functions::*;
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 
@@ -28,22 +27,22 @@ pub struct Interpreter<'a> {
 
 struct ExecutionContext<'a> {
     task: &'a ast::Task<'a>,
-    variables: RefCell<BTreeMap<&'a str, Value<'a>>>,
+    variables: BTreeMap<&'a str, Value<'a>>,
 }
 
-pub fn new<'a>(ast: &'a ast::Ast<'a>) -> Result<RefCell<Interpreter<'a>>, String> {
+pub fn new<'a>(ast: &'a ast::Ast<'a>) -> Result<Interpreter<'a>, String> {
     Interpreter::new(ast)
 }
 
 impl<'a> Interpreter<'a> {
-    pub fn new(prog: &'a ast::Ast<'a>) -> Result<RefCell<Interpreter<'a>>, String> {
-        let interpreter = RefCell::new(Interpreter {
+    pub fn new(prog: &'a ast::Ast<'a>) -> Result<Interpreter<'a>, String> {
+        let mut interpreter = Interpreter {
             constants: BTreeMap::new(),
             tasks: BTreeMap::new(),
             functions: functions().iter().map(|f| (f.name(), *f)).collect(),
-        });
+        };
 
-        interpreter.borrow_mut().load(prog)?;
+        interpreter.load(prog)?;
         Ok(interpreter)
     }
 
@@ -52,24 +51,17 @@ impl<'a> Interpreter<'a> {
             .tasks
             .get(&task[..])
             .ok_or(format!("task '{}' not found", task))?;
-        let context = ExecutionContext {
+        self.run_task(ExecutionContext {
             task,
-            variables: RefCell::new(BTreeMap::new()),
-        };
-        self.run_task(context)
+            variables: BTreeMap::new(),
+        })
     }
 
-    fn run_task(&self, context: ExecutionContext<'a>) -> Result<(), String> {
+    fn run_task(&self, mut context: ExecutionContext<'a>) -> Result<(), String> {
         for statement in &context.task.statements {
-            let res = match statement {
-                ast::Statement::Assignment(ident, value) => {
-                    self.run_task_assignment(&context, &ident, &value)
-                }
-                ast::Statement::Call(ident, args) => self.run_task_call(&context, &ident, args),
-            };
-
-            if res.is_err() {
-                return res;
+            match statement {
+                ast::Statement::Assignment(ident, value) => self.run_task_assignment(&mut context, &ident, &value)?,
+                ast::Statement::Call(ident, args) => self.run_task_call(&context, &ident, args)?,
             }
         }
 
@@ -78,12 +70,12 @@ impl<'a> Interpreter<'a> {
 
     fn run_task_assignment(
         &self,
-        context: &ExecutionContext<'a>,
+        context: &mut ExecutionContext<'a>,
         ast::Ident(name): &ast::Ident<'a>,
         value: &ast::Value<'a>,
     ) -> Result<(), String> {
         let value = self.load_value(Some(&context), value)?;
-        context.variables.borrow_mut().insert(name, value);
+        context.variables.insert(name, value);
         Ok(())
     }
 
@@ -171,9 +163,9 @@ impl<'a> Interpreter<'a> {
         context: Option<&ExecutionContext<'a>>,
         ident: &'a str,
     ) -> Option<Value<'a>> {
-        // less magic here, please
         context
-            .and_then(|c| Some(*c.variables.borrow().get(ident)?))
-            .or_else(|| Some(*self.constants.get(ident)?))
+            .and_then(|c| c.variables.get(ident))
+            .or_else(|| self.constants.get(ident))
+            .map(|r| *r)
     }
 }

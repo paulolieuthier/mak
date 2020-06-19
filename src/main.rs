@@ -17,7 +17,7 @@ fn main() -> Result<(), String> {
     let ast = parser::parse(&contents[..])?;
     let interpreter = interpreter::new(&ast)?;
     for task in env::args().skip(1) {
-        interpreter.borrow().run(&task[..])?;
+        interpreter.run(&task[..])?;
     }
 
     Ok(())
