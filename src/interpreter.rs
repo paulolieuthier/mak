@@ -60,7 +60,9 @@ impl<'a> Interpreter<'a> {
     fn run_task(&self, mut context: ExecutionContext<'a>) -> Result<(), String> {
         for statement in &context.task.statements {
             match statement {
-                ast::Statement::Assignment(ident, value) => self.run_task_assignment(&mut context, &ident, &value)?,
+                ast::Statement::Assignment(ident, value) => {
+                    self.run_task_assignment(&mut context, &ident, &value)?
+                }
                 ast::Statement::Call(ident, args) => self.run_task_call(&context, &ident, args)?,
             }
         }
@@ -111,17 +113,13 @@ impl<'a> Interpreter<'a> {
 
     fn load(&mut self, ast::Ast(exprs): &'a ast::Ast<'a>) -> Result<(), String> {
         for expr in exprs {
-            let res = match expr {
+            match expr {
                 ast::TopLevelExpr::Import(_) => {
                     println!("import!");
-                    Ok(())
+                    ()
                 }
-                ast::TopLevelExpr::Constant(constant) => self.load_constant(&constant),
-                ast::TopLevelExpr::Task(task) => self.load_task(&task),
-            };
-
-            if res.is_err() {
-                return res;
+                ast::TopLevelExpr::Constant(constant) => self.load_constant(&constant)?,
+                ast::TopLevelExpr::Task(task) => self.load_task(&task)?,
             }
         }
 
