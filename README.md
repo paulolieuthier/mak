@@ -14,15 +14,19 @@ task taskname:
     yo = 123
     print(yo)
     print(x)
+    z = ask(msg: "new value: ", default: "fallback")
+    print(z)
 
 $ mak taskname
 123
 value
+new value: 456
+456
 ```
 
 # Features
 
-* Built-in functions with named arguments
+* Built-in functions with named arguments and return types (`print` and `ask`)
 
 # TODO
 
@@ -32,15 +36,6 @@ tast example:
     x = 123
     print("this is the value for x: #{x}")
 ```
-
-* Support built-in functions with return values:
-```
-task example:
-    x = ask(msg: "replicas: ", default: 1)
-    print(x)
-```
-
-* More built-in functions (`ask` to get user input, what else?)
 
 * Better integration with shellscript:
 ```

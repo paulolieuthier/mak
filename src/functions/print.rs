@@ -19,13 +19,15 @@ impl Function for PrintFunction {
         "print"
     }
 
-    fn single_arg_call(&self, arg: &Value) {
+    fn single_arg_call<'a>(&self, arg: &Value<'a>) -> Result<Option<Value<'a>>, String> {
         println!("{}", arg);
+        Ok(None)
     }
 
-    fn named_args_call(&self, args: BTreeMap<&str, Value>) {
-        assert!(args.len() == ARGS.len());
-        assert!(args.keys().into_iter().all(|arg| ARGS.contains(arg)));
-        println!("{}", args.get(MSG_ARG).unwrap());
+    fn named_args_call<'a>(&self, args: BTreeMap<&str, Value<'a>>) -> Result<Option<Value<'a>>, String> {
+        match args.get(MSG_ARG) {
+            Some(arg) => self.single_arg_call(arg),
+            None => Err(format!("print: argument 'msg' missing")),
+        }
     }
 }

@@ -53,31 +53,31 @@ task task2:
             ast::TopLevelExpr::Import("xalalo"),
             ast::TopLevelExpr::Constant(ast::Constant {
                 name: ast::Ident("x"),
-                value: ast::Value::Text("value")
+                value: ast::RightHandSide::Text("value")
             }),
             ast::TopLevelExpr::Task(ast::Task {
                 name: ast::Ident("task1"),
                 statements: vec![
-                    ast::Statement::Call(
-                        ast::Ident("print"),
-                        ast::Args::Simple(ast::Value::Reference(ast::Ident("x")))
-                    ),
-                    ast::Statement::Assignment(ast::Ident("yo"), ast::Value::Number(123f32)),
-                    ast::Statement::Call(
-                        ast::Ident("print"),
-                        ast::Args::Simple(ast::Value::Reference(ast::Ident("yo")))
-                    ),
+                    ast::Statement::Call(ast::Call {
+                        callee: ast::Ident("print"),
+                        args: ast::Args::Simple(ast::RightHandSide::Reference(ast::Ident("x")))
+                    }),
+                    ast::Statement::Assignment(ast::Ident("yo"), ast::RightHandSide::Number(123f32)),
+                    ast::Statement::Call(ast::Call {
+                        callee: ast::Ident("print"),
+                        args: ast::Args::Simple(ast::RightHandSide::Reference(ast::Ident("yo")))
+                    }),
                 ]
             }),
             ast::TopLevelExpr::Task(ast::Task {
                 name: ast::Ident("task2"),
-                statements: vec![ast::Statement::Call(
-                    ast::Ident("print"),
-                    ast::Args::Named(vec![ast::Arg {
+                statements: vec![ast::Statement::Call(ast::Call {
+                    callee: ast::Ident("print"),
+                    args: ast::Args::Named(vec![ast::Arg {
                         name: ast::Ident("msg"),
-                        value: ast::Value::Text("named arg")
+                        value: ast::RightHandSide::Text("named arg")
                     }])
-                )]
+                })]
             }),
         ]))
     );
@@ -148,7 +148,7 @@ fn parse_toplevel_constant(i: &str) -> ParserResult<ast::TopLevelExpr> {
     let (i, _) = space(i)?;
     let (i, _) = char('=')(i)?;
     let (i, _) = space(i)?;
-    let (i, value) = ident_or_value(i)?;
+    let (i, value) = right_hand_side(i)?;
     Ok((
         i,
         ast::TopLevelExpr::Constant(ast::Constant { name, value }),
@@ -163,7 +163,7 @@ fn test_parse_toplevel_constant() {
             "",
             ast::TopLevelExpr::Constant(ast::Constant {
                 name: ast::Ident("xx"),
-                value: ast::Value::Number(42f32)
+                value: ast::RightHandSide::Number(42f32)
             })
         ))
     );
@@ -173,7 +173,7 @@ fn test_parse_toplevel_constant() {
             "",
             ast::TopLevelExpr::Constant(ast::Constant {
                 name: ast::Ident("xx"),
-                value: ast::Value::Text("42")
+                value: ast::RightHandSide::Text("42")
             })
         ))
     );
@@ -183,7 +183,7 @@ fn test_parse_toplevel_constant() {
             "",
             ast::TopLevelExpr::Constant(ast::Constant {
                 name: ast::Ident("xx"),
-                value: ast::Value::Reference(ast::Ident("yy"))
+                value: ast::RightHandSide::Reference(ast::Ident("yy"))
             })
         ))
     );
@@ -211,11 +211,11 @@ fn test_parse_toplevel_task() {
             ast::TopLevelExpr::Task(ast::Task {
                 name: ast::Ident("xalala"),
                 statements: vec![
-                    ast::Statement::Assignment(ast::Ident("x"), ast::Value::Text("y")),
-                    ast::Statement::Call(
-                        ast::Ident("print"),
-                        ast::Args::Simple(ast::Value::Text("xalalo"))
-                    )
+                    ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y")),
+                    ast::Statement::Call(ast::Call {
+                        callee: ast::Ident("print"),
+                        args: ast::Args::Simple(ast::RightHandSide::Text("xalalo"))
+                    })
                 ]
             })
         ))
@@ -224,7 +224,7 @@ fn test_parse_toplevel_task() {
 
 fn parse_task_statement<'a>(i: &'a str, indent: &'_ str) -> ParserResult<'a, ast::Statement<'a>> {
     let (i, _) = tag(indent)(i)?;
-    let (i, statement) = alt((parse_task_statement_assignment, parse_task_statement_call))(i)?;
+    let (i, statement) = alt((parse_task_statement_assignment, map(parse_call, ast::Statement::Call)))(i)?;
     let (i, _) = newline_or_eof(i)?;
     Ok((i, statement))
 }
@@ -235,21 +235,21 @@ fn test_parse_task_statement() {
         parse_task_statement("  x = \"y\"", "  "),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::Value::Text("y"))
+            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
         ))
     );
     assert_eq!(
         parse_task_statement("\tx = \"y\"", "\t"),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::Value::Text("y"))
+            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
         ))
     );
     assert_eq!(
         parse_task_statement("\tx = \"y\"\n", "\t"),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::Value::Text("y"))
+            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
         ))
     );
 }
@@ -259,7 +259,7 @@ fn parse_task_statement_assignment(i: &str) -> ParserResult<ast::Statement> {
     let (i, _) = space(i)?;
     let (i, _) = char('=')(i)?;
     let (i, _) = space(i)?;
-    let (i, value) = ident_or_value(i)?;
+    let (i, value) = right_hand_side(i)?;
     Ok((i, ast::Statement::Assignment(name, value)))
 }
 
@@ -269,205 +269,212 @@ fn test_parse_task_statement_assignment() {
         parse_task_statement_assignment("x = \"y\""),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::Value::Text("y"))
+            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
         ))
     );
     assert_eq!(
         parse_task_statement_assignment("x  = \t \"y\""),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::Value::Text("y"))
+            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
         ))
     );
     assert_eq!(
         parse_task_statement_assignment("x=\"y\""),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::Value::Text("y"))
+            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
+        ))
+    );
+    assert_eq!(
+        parse_task_statement_assignment("x = fn(\"y\")"),
+        Ok((
+            "",
+            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Call(Box::new(ast::Call { callee: ast::Ident("fn"), args: ast::Args::Simple(ast::RightHandSide::Text("y")) })))
         ))
     );
 }
 
-fn parse_task_statement_call(i: &str) -> ParserResult<ast::Statement> {
+fn parse_call(i: &str) -> ParserResult<ast::Call> {
     let (i, callee) = ident(i)?;
     let (i, _) = space(i)?;
 
     let simple_arg_parser = complete(delimited(
         char('('),
-        delimited(space, parse_task_statement_call_simple_arg, space),
+        delimited(space, parse_call_simple_args, space),
         char(')'),
     ));
     let named_args_parser = complete(delimited(
         char('('),
-        delimited(space, parse_task_statement_call_named_args, space),
+        delimited(space, parse_call_named_args, space),
         char(')'),
     ));
     let (i, args) = alt((named_args_parser, simple_arg_parser))(i)?;
 
-    Ok((i, ast::Statement::Call(callee, args)))
+    Ok((i, ast::Call { callee, args }))
 }
 
 #[test]
-fn test_parse_task_statement_call() {
+fn test_parse_call() {
     assert_eq!(
-        parse_task_statement_call("print(\"xalala\")"),
+        parse_call("print(\"xalala\")"),
         Ok((
             "",
-            ast::Statement::Call(
-                ast::Ident("print"),
-                ast::Args::Simple(ast::Value::Text("xalala"))
-            )
+            ast::Call {
+                callee: ast::Ident("print"),
+                args: ast::Args::Simple(ast::RightHandSide::Text("xalala"))
+            }
         ))
     );
     assert_eq!(
-        parse_task_statement_call("print(arg: \"xalala\")"),
+        parse_call("print(arg: \"xalala\")"),
         Ok((
             "",
-            ast::Statement::Call(
-                ast::Ident("print"),
-                ast::Args::Named(vec![ast::Arg {
+            ast::Call {
+                callee: ast::Ident("print"),
+                args: ast::Args::Named(vec![ast::Arg {
                     name: ast::Ident("arg"),
-                    value: ast::Value::Text("xalala")
+                    value: ast::RightHandSide::Text("xalala")
                 }])
-            )
+            }
         ))
     );
     assert_eq!(
-        parse_task_statement_call("print(42)"),
+        parse_call("print(42)"),
         Ok((
             "",
-            ast::Statement::Call(
-                ast::Ident("print"),
-                ast::Args::Simple(ast::Value::Number(42f32))
-            )
+            ast::Call {
+                callee: ast::Ident("print"),
+                args: ast::Args::Simple(ast::RightHandSide::Number(42f32))
+            }
         ))
     );
     assert_eq!(
-        parse_task_statement_call("print(arg: 42)"),
+        parse_call("print(arg: 42)"),
         Ok((
             "",
-            ast::Statement::Call(
-                ast::Ident("print"),
-                ast::Args::Named(vec![ast::Arg {
+            ast::Call {
+                callee: ast::Ident("print"),
+                args: ast::Args::Named(vec![ast::Arg {
                     name: ast::Ident("arg"),
-                    value: ast::Value::Number(42f32)
+                    value: ast::RightHandSide::Number(42f32)
                 }])
-            )
+            }
         ))
     );
     assert_eq!(
-        parse_task_statement_call("print(arg1: 42, arg2: \"xalala\")"),
+        parse_call("print(arg1: 42, arg2: \"xalala\")"),
         Ok((
             "",
-            ast::Statement::Call(
-                ast::Ident("print"),
-                ast::Args::Named(vec![
+            ast::Call {
+                callee: ast::Ident("print"),
+                args: ast::Args::Named(vec![
                     ast::Arg {
                         name: ast::Ident("arg1"),
-                        value: ast::Value::Number(42f32)
+                        value: ast::RightHandSide::Number(42f32)
                     },
                     ast::Arg {
                         name: ast::Ident("arg2"),
-                        value: ast::Value::Text("xalala")
+                        value: ast::RightHandSide::Text("xalala")
                     }
                 ])
-            )
+            }
         ))
     );
 }
 
-fn parse_task_statement_call_simple_arg(i: &str) -> ParserResult<ast::Args> {
-    let (i, arg) = ident_or_value(i)?;
+fn parse_call_simple_args(i: &str) -> ParserResult<ast::Args> {
+    let (i, arg) = right_hand_side(i)?;
     Ok((i, ast::Args::Simple(arg)))
 }
 
 #[test]
-fn test_parse_task_statement_call_simple_arg() {
+fn test_parse_call_simple_args() {
     assert_eq!(
-        parse_task_statement_call_simple_arg("42"),
-        Ok(("", ast::Args::Simple(ast::Value::Number(42f32))))
+        parse_call_simple_args("42"),
+        Ok(("", ast::Args::Simple(ast::RightHandSide::Number(42f32))))
     );
     assert_eq!(
-        parse_task_statement_call_simple_arg("\"value\""),
-        Ok(("", ast::Args::Simple(ast::Value::Text("value"))))
+        parse_call_simple_args("\"value\""),
+        Ok(("", ast::Args::Simple(ast::RightHandSide::Text("value"))))
     );
 }
 
-fn parse_task_statement_call_named_args(i: &str) -> ParserResult<ast::Args> {
+fn parse_call_named_args(i: &str) -> ParserResult<ast::Args> {
     let (i, args) = complete(separated_list(
         delimited(space, tag(","), space),
-        parse_task_statement_call_named_arg,
+        parse_call_named_args_arg,
     ))(i)?;
     Ok((i, ast::Args::Named(args)))
 }
 
 #[test]
-fn test_parse_task_statement_call_named_args() {
+fn test_parse_call_named_args() {
     assert_eq!(
-        parse_task_statement_call_named_args("arg:\"value\""),
+        parse_call_named_args("arg:\"value\""),
         Ok((
             "",
             ast::Args::Named(vec![ast::Arg {
                 name: ast::Ident("arg"),
-                value: ast::Value::Text("value")
+                value: ast::RightHandSide::Text("value")
             }])
         ))
     );
     assert_eq!(
-        parse_task_statement_call_named_args("arg: \"value\""),
+        parse_call_named_args("arg: \"value\""),
         Ok((
             "",
             ast::Args::Named(vec![ast::Arg {
                 name: ast::Ident("arg"),
-                value: ast::Value::Text("value")
+                value: ast::RightHandSide::Text("value")
             }])
         ))
     );
     assert_eq!(
-        parse_task_statement_call_named_args("arg1: \"value1\", arg2: \"value2\""),
+        parse_call_named_args("arg1: \"value1\", arg2: \"value2\""),
         Ok((
             "",
             ast::Args::Named(vec![
                 ast::Arg {
                     name: ast::Ident("arg1"),
-                    value: ast::Value::Text("value1")
+                    value: ast::RightHandSide::Text("value1")
                 },
                 ast::Arg {
                     name: ast::Ident("arg2"),
-                    value: ast::Value::Text("value2")
+                    value: ast::RightHandSide::Text("value2")
                 }
             ])
         ))
     );
 }
 
-fn parse_task_statement_call_named_arg(i: &str) -> ParserResult<ast::Arg> {
+fn parse_call_named_args_arg(i: &str) -> ParserResult<ast::Arg> {
     let (i, name) = ident(i)?;
     let (i, _) = tag(":")(i)?;
     let (i, _) = space(i)?;
-    let (i, value) = ident_or_value(i)?;
+    let (i, value) = right_hand_side(i)?;
     Ok((i, ast::Arg { name, value }))
 }
 
 #[test]
-fn test_parse_task_statement_call_named_arg() {
+fn test_parse_call_named_args_arg() {
     assert_eq!(
-        parse_task_statement_call_named_arg("arg:\"value\""),
+        parse_call_named_args_arg("arg:\"value\""),
         Ok((
             "",
             ast::Arg {
                 name: ast::Ident("arg"),
-                value: ast::Value::Text("value")
+                value: ast::RightHandSide::Text("value")
             }
         ))
     );
     assert_eq!(
-        parse_task_statement_call_named_arg("arg:  \"value\""),
+        parse_call_named_args_arg("arg:  \"value\""),
         Ok((
             "",
             ast::Arg {
                 name: ast::Ident("arg"),
-                value: ast::Value::Text("value")
+                value: ast::RightHandSide::Text("value")
             }
         ))
     );
@@ -554,23 +561,24 @@ fn test_string() {
     assert_eq!(string("\"xa la la\""), Ok(("", "xa la la")));
 }
 
-fn number(i: &str) -> ParserResult<ast::Value> {
-    map(float, ast::Value::Number)(i)
+fn number(i: &str) -> ParserResult<ast::RightHandSide> {
+    map(float, ast::RightHandSide::Number)(i)
 }
 
 #[test]
 fn test_number() {
-    assert_eq!(number("42"), Ok(("", ast::Value::Number(42f32))));
-    assert_eq!(number("-42"), Ok(("", ast::Value::Number(-42f32))));
-    assert_eq!(number("42.42"), Ok(("", ast::Value::Number(42.42f32))));
+    assert_eq!(number("42"), Ok(("", ast::RightHandSide::Number(42f32))));
+    assert_eq!(number("-42"), Ok(("", ast::RightHandSide::Number(-42f32))));
+    assert_eq!(number("42.42"), Ok(("", ast::RightHandSide::Number(42.42f32))));
 }
 
-fn value(i: &str) -> ParserResult<ast::Value> {
-    let string_parser = map(string, ast::Value::Text);
+fn value(i: &str) -> ParserResult<ast::RightHandSide> {
+    let string_parser = map(string, ast::RightHandSide::Text);
     alt((complete(string_parser), complete(number)))(i)
 }
 
-fn ident_or_value(i: &str) -> ParserResult<ast::Value> {
-    let ident_parser = map(ident, ast::Value::Reference);
-    alt((complete(ident_parser), complete(value)))(i)
+fn right_hand_side(i: &str) -> ParserResult<ast::RightHandSide> {
+    let ident_parser = map(ident, ast::RightHandSide::Reference);
+    let call_parser = map(parse_call, |call| ast::RightHandSide::Call(Box::new(call)));
+    alt((complete(call_parser), complete(ident_parser), complete(value)))(i)
 }

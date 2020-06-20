@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod value;
 pub mod functions;
 pub mod interpreter;
 pub mod parser;

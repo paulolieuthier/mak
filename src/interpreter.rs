@@ -1,23 +1,9 @@
 use crate::ast;
 use crate::functions::*;
+use crate::value::*;
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::fmt::Display;
-
-#[derive(Clone, Copy, Debug)]
-pub enum Value<'a> {
-    Text(&'a str),
-    Number(f32),
-}
-
-impl<'a> Display for Value<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Text(text) => write!(f, "{}", text),
-            Value::Number(number) => write!(f, "{}", number),
-        }
-    }
-}
 
 pub struct Interpreter<'a> {
     constants: BTreeMap<&'a str, Value<'a>>,
@@ -61,9 +47,11 @@ impl<'a> Interpreter<'a> {
         for statement in &context.task.statements {
             match statement {
                 ast::Statement::Assignment(ident, value) => {
-                    self.run_task_assignment(&mut context, &ident, &value)?
+                    self.run_task_assignment(&mut context, &ident, &value)?;
                 }
-                ast::Statement::Call(ident, args) => self.run_task_call(&context, &ident, args)?,
+                ast::Statement::Call(call) => {
+                    self.run_task_call(&context, &call.callee, &call.args)?;
+                }
             }
         }
 
@@ -74,7 +62,7 @@ impl<'a> Interpreter<'a> {
         &self,
         context: &mut ExecutionContext<'a>,
         ast::Ident(name): &ast::Ident<'a>,
-        value: &ast::Value<'a>,
+        value: &ast::RightHandSide<'a>,
     ) -> Result<(), String> {
         let value = self.load_value(Some(&context), value)?;
         context.variables.insert(name, value);
@@ -86,7 +74,7 @@ impl<'a> Interpreter<'a> {
         context: &ExecutionContext<'a>,
         ast::Ident(name): &ast::Ident<'a>,
         args: &ast::Args<'a>,
-    ) -> Result<(), String> {
+    ) -> Result<Option<Value<'a>>, String> {
         let function: &dyn Function = *self
             .functions
             .get(name)
@@ -95,7 +83,7 @@ impl<'a> Interpreter<'a> {
         match args {
             ast::Args::Simple(arg) => {
                 let arg = self.load_value(Some(&context), arg)?;
-                function.single_arg_call(&arg);
+                function.single_arg_call(&arg)
             }
             ast::Args::Named(args) => {
                 let args = args
@@ -105,10 +93,9 @@ impl<'a> Interpreter<'a> {
                             .map(|value| (name.0, value))
                     })
                     .collect::<Result<BTreeMap<&str, Value<'a>>, String>>()?;
-                function.named_args_call(args);
+                function.named_args_call(args)
             }
         }
-        Ok(())
     }
 
     fn load(&mut self, ast::Ast(exprs): &'a ast::Ast<'a>) -> Result<(), String> {
@@ -145,14 +132,17 @@ impl<'a> Interpreter<'a> {
     fn load_value(
         &self,
         context: Option<&ExecutionContext<'a>>,
-        value: &ast::Value<'a>,
+        value: &ast::RightHandSide<'a>,
     ) -> Result<Value<'a>, String> {
         match value {
-            ast::Value::Text(text) => Ok(Value::Text(text)),
-            ast::Value::Number(number) => Ok(Value::Number(*number)),
-            ast::Value::Reference(ast::Ident(ident)) => self
+            ast::RightHandSide::Text(text) => Ok(Value::from_text(Cow::from(*text))),
+            ast::RightHandSide::Number(number) => Ok(Value::from_number(*number)),
+            ast::RightHandSide::Reference(ast::Ident(ident)) => self
                 .lookup_reference(context, ident)
                 .ok_or(format!("Can't handle value: {}", value)),
+            ast::RightHandSide::Call(call) => self
+                .run_task_call(context.ok_or(format!("Function call now allowed here"))?, &call.callee, &call.args)
+                .and_then(|value| value.ok_or(format!("Attempted to use value from void function")))
         }
     }
 
@@ -164,6 +154,6 @@ impl<'a> Interpreter<'a> {
         context
             .and_then(|c| c.variables.get(ident))
             .or_else(|| self.constants.get(ident))
-            .map(|r| *r)
+            .map(|v| v.clone())
     }
 }
