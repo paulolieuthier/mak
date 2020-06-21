@@ -1,6 +1,5 @@
 use super::*;
 use lazy_static::*;
-use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 
@@ -27,13 +26,12 @@ impl Function for AskFunction {
         print!("{}", arg);
         self.flush_stdout()?;
         let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => {
-                let without_newline = input[0 .. input.len() - 1].to_owned();
-                Ok(Some(Value::from_text(Cow::from(without_newline))))
-            }
-            Err(_) => Err(format!("ask: failure to get user input")),
-        }
+        let without_newline = match io::stdin().read_line(&mut input) {
+            Ok(_) => input[0..input.len() - 1].to_owned(),
+            Err(_) => return Err(format!("ask: failure to get user input")),
+        };
+
+        Ok(Some(Value::from_text(without_newline)))
     }
 
     fn named_args_call<'a>(&self, args: BTreeMap<&'a str, Value<'a>>) -> Result<Option<Value<'a>>, String> {

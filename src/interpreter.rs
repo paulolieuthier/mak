@@ -2,7 +2,6 @@ use crate::ast;
 use crate::functions::*;
 use crate::value::*;
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 pub struct Interpreter<'a> {
@@ -135,7 +134,7 @@ impl<'a> Interpreter<'a> {
         value: &ast::RightHandSide<'a>,
     ) -> Result<Value<'a>, String> {
         match value {
-            ast::RightHandSide::Text(text) => Ok(Value::from_text(Cow::from(*text))),
+            ast::RightHandSide::Text(text) => Ok(Value::from_text(*text)),
             ast::RightHandSide::Number(number) => Ok(Value::from_number(*number)),
             ast::RightHandSide::Reference(ast::Ident(ident)) => self
                 .lookup_reference(context, ident)

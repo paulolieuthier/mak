@@ -13,9 +13,9 @@ pub struct Value<'a> {
 }
 
 impl<'a> Value<'a> {
-    pub fn from_text(text: Cow<'a, str>) -> Value<'a> {
+    pub fn from_text<T: Into<Cow<'a, str>>>(text: T) -> Value<'a> {
         Value {
-            inner: Cow::Owned(InnerValue::Text(text))
+            inner: Cow::Owned(InnerValue::Text(text.into())),
         }
     }
 
