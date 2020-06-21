@@ -24,7 +24,10 @@ impl Function for PrintFunction {
         Ok(None)
     }
 
-    fn named_args_call<'a>(&self, args: BTreeMap<&str, Value<'a>>) -> Result<Option<Value<'a>>, String> {
+    fn named_args_call<'a>(
+        &self,
+        args: BTreeMap<&str, Value<'a>>,
+    ) -> Result<Option<Value<'a>>, String> {
         match args.get(MSG_ARG) {
             Some(arg) => self.single_arg_call(arg),
             None => Err(format!("print: argument 'msg' missing")),

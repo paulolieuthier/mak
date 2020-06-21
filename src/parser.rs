@@ -62,7 +62,10 @@ task task2:
                         callee: ast::Ident("print"),
                         args: ast::Args::Simple(ast::RightHandSide::Reference(ast::Ident("x")))
                     }),
-                    ast::Statement::Assignment(ast::Ident("yo"), ast::RightHandSide::Number(123f32)),
+                    ast::Statement::Assignment(
+                        ast::Ident("yo"),
+                        ast::RightHandSide::Number(123f32)
+                    ),
                     ast::Statement::Call(ast::Call {
                         callee: ast::Ident("print"),
                         args: ast::Args::Simple(ast::RightHandSide::Reference(ast::Ident("yo")))
@@ -224,7 +227,10 @@ fn test_parse_toplevel_task() {
 
 fn parse_task_statement<'a>(i: &'a str, indent: &'_ str) -> ParserResult<'a, ast::Statement<'a>> {
     let (i, _) = tag(indent)(i)?;
-    let (i, statement) = alt((parse_task_statement_assignment, map(parse_call, ast::Statement::Call)))(i)?;
+    let (i, statement) = alt((
+        parse_task_statement_assignment,
+        map(parse_call, ast::Statement::Call),
+    ))(i)?;
     let (i, _) = newline_or_eof(i)?;
     Ok((i, statement))
 }
@@ -290,7 +296,13 @@ fn test_parse_task_statement_assignment() {
         parse_task_statement_assignment("x = fn(\"y\")"),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Call(Box::new(ast::Call { callee: ast::Ident("fn"), args: ast::Args::Simple(ast::RightHandSide::Text("y")) })))
+            ast::Statement::Assignment(
+                ast::Ident("x"),
+                ast::RightHandSide::Call(Box::new(ast::Call {
+                    callee: ast::Ident("fn"),
+                    args: ast::Args::Simple(ast::RightHandSide::Text("y"))
+                }))
+            )
         ))
     );
 }
@@ -569,7 +581,10 @@ fn number(i: &str) -> ParserResult<ast::RightHandSide> {
 fn test_number() {
     assert_eq!(number("42"), Ok(("", ast::RightHandSide::Number(42f32))));
     assert_eq!(number("-42"), Ok(("", ast::RightHandSide::Number(-42f32))));
-    assert_eq!(number("42.42"), Ok(("", ast::RightHandSide::Number(42.42f32))));
+    assert_eq!(
+        number("42.42"),
+        Ok(("", ast::RightHandSide::Number(42.42f32)))
+    );
 }
 
 fn value(i: &str) -> ParserResult<ast::RightHandSide> {
@@ -580,5 +595,9 @@ fn value(i: &str) -> ParserResult<ast::RightHandSide> {
 fn right_hand_side(i: &str) -> ParserResult<ast::RightHandSide> {
     let ident_parser = map(ident, ast::RightHandSide::Reference);
     let call_parser = map(parse_call, |call| ast::RightHandSide::Call(Box::new(call)));
-    alt((complete(call_parser), complete(ident_parser), complete(value)))(i)
+    alt((
+        complete(call_parser),
+        complete(ident_parser),
+        complete(value),
+    ))(i)
 }

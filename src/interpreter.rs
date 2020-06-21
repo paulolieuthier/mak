@@ -139,9 +139,14 @@ impl<'a> Interpreter<'a> {
             ast::RightHandSide::Reference(ast::Ident(ident)) => self
                 .lookup_reference(context, ident)
                 .ok_or(format!("Can't handle value: {}", value)),
-            ast::RightHandSide::Call(call) => self
-                .run_task_call(context.ok_or(format!("Function call now allowed here"))?, &call.callee, &call.args)
+            ast::RightHandSide::Call(call) => {
+                self.run_task_call(
+                    context.ok_or(format!("Function call now allowed here"))?,
+                    &call.callee,
+                    &call.args,
+                )
                 .and_then(|value| value.ok_or(format!("Attempted to use value from void function")))
+            }
         }
     }
 

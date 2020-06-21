@@ -21,7 +21,7 @@ impl<'a> Value<'a> {
 
     pub fn from_number(number: f32) -> Value<'a> {
         Value {
-            inner: Cow::Owned(InnerValue::Number(number))
+            inner: Cow::Owned(InnerValue::Number(number)),
         }
     }
 }

@@ -34,7 +34,10 @@ impl Function for AskFunction {
         Ok(Some(Value::from_text(without_newline)))
     }
 
-    fn named_args_call<'a>(&self, args: BTreeMap<&'a str, Value<'a>>) -> Result<Option<Value<'a>>, String> {
+    fn named_args_call<'a>(
+        &self,
+        args: BTreeMap<&'a str, Value<'a>>,
+    ) -> Result<Option<Value<'a>>, String> {
         let msg = match args.get(MSG_ARG) {
             Some(value) => value,
             None => return Err(format!("ask: argument 'msg' missing")),

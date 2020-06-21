@@ -80,9 +80,7 @@ impl<'a> Display for Args<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Args::Simple(arg) => write!(f, "{}", arg),
-            Args::Named(args) => {
-                args.iter().map(|arg| write!(f, "{}, ", arg)).collect()
-            },
+            Args::Named(args) => args.iter().map(|arg| write!(f, "{}, ", arg)).collect(),
         }
     }
 }
