@@ -40,4 +40,5 @@ task example:
     print("Deployed!")
 ```
 
-* Better parsing error messages
+* Tests for interpreter
+* Better error messages for parser and interpreter errors
