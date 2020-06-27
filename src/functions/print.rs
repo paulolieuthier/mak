@@ -1,5 +1,6 @@
 use super::*;
 use lazy_static::*;
+use maplit::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub struct PrintFunction;
@@ -7,11 +8,7 @@ pub struct PrintFunction;
 const MSG_ARG: &'static str = "msg";
 
 lazy_static! {
-    static ref ARGS: BTreeSet<&'static str> = {
-        let mut set = BTreeSet::new();
-        set.insert(MSG_ARG);
-        set
-    };
+    static ref ARGS: BTreeSet<&'static str> = btreeset![MSG_ARG];
 }
 
 impl Function for PrintFunction {

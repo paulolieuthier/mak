@@ -15,7 +15,7 @@ task taskname:
     print(yo)
     print(x)
     z = ask(msg: "new value: ", default: "fallback")
-    print(z)
+    print("#{x}: #{z}")
 
 $ mak taskname
 123
@@ -27,15 +27,9 @@ new value: 456
 # Features
 
 * Built-in functions with named arguments and return types (`print` and `ask`)
+* String interpolation
 
 # TODO
-
-* String interpolation:
-```
-tast example:
-    x = 123
-    print("this is the value for x: #{x}")
-```
 
 * Better integration with shellscript:
 ```

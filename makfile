@@ -10,5 +10,4 @@ task task1:
     yo = 123
     print(yo)
     new = ask(msg: "new: ")
-    print(x)
-    print(new)
+    print("#{x}: \"#{new}\"")

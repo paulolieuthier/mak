@@ -1,5 +1,6 @@
 use super::*;
 use lazy_static::*;
+use maplit::*;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 
@@ -9,12 +10,7 @@ const MSG_ARG: &'static str = "msg";
 const DEFAULT_ARG: &'static str = "default";
 
 lazy_static! {
-    static ref ARGS: BTreeSet<&'static str> = {
-        let mut set = BTreeSet::new();
-        set.insert(MSG_ARG);
-        set.insert(DEFAULT_ARG);
-        set
-    };
+    static ref ARGS: BTreeSet<&'static str> = btreeset![MSG_ARG, DEFAULT_ARG];
 }
 
 impl Function for AskFunction {

@@ -1,9 +1,12 @@
 use crate::ast;
-
 use nom::{
     branch::alt, bytes::complete::*, character::complete::*, combinator::*, error::*, multi::*,
     number::complete::*, sequence::*, IResult,
 };
+use std::collections::BTreeSet;
+
+#[cfg(test)]
+use maplit::*;
 
 pub fn parse(i: &str) -> Result<ast::Ast, String> {
     parse_proper(i).map(|(_, prog)| prog).map_err(|e| match e {
@@ -46,6 +49,7 @@ task task1:
 
 task task2:
     print(msg: "named arg")
+    print(msg: "interpolation: #{value}")
 "#
         ),
         Ok(ast::Ast(vec![
@@ -53,7 +57,7 @@ task task2:
             ast::TopLevelExpr::Import("xalalo"),
             ast::TopLevelExpr::Constant(ast::Constant {
                 name: ast::Ident("x"),
-                value: ast::RightHandSide::Text("value")
+                value: ast::RightHandSide::Text(ast::Text::Simple("value"))
             }),
             ast::TopLevelExpr::Task(ast::Task {
                 name: ast::Ident("task1"),
@@ -74,13 +78,31 @@ task task2:
             }),
             ast::TopLevelExpr::Task(ast::Task {
                 name: ast::Ident("task2"),
-                statements: vec![ast::Statement::Call(ast::Call {
-                    callee: ast::Ident("print"),
-                    args: ast::Args::Named(vec![ast::Arg {
-                        name: ast::Ident("msg"),
-                        value: ast::RightHandSide::Text("named arg")
-                    }])
-                })]
+                statements: vec![
+                    ast::Statement::Call(ast::Call {
+                        callee: ast::Ident("print"),
+                        args: ast::Args::Named(vec![ast::Arg {
+                            name: ast::Ident("msg"),
+                            value: ast::RightHandSide::Text(ast::Text::Simple("named arg"))
+                        }])
+                    }),
+                    ast::Statement::Call(ast::Call {
+                        callee: ast::Ident("print"),
+                        args: ast::Args::Named(vec![ast::Arg {
+                            name: ast::Ident("msg"),
+                            value: ast::RightHandSide::Text(ast::Text::Complex(
+                                ast::Interpolation {
+                                    content: "interpolation: #{value}".to_string(),
+                                    vars: btreeset![ast::InterpolationVar {
+                                        name: ast::Ident("value"),
+                                        start: 15,
+                                        end: 23
+                                    }]
+                                }
+                            ))
+                        }])
+                    }),
+                ]
             }),
         ]))
     );
@@ -123,7 +145,7 @@ fn test_parse_toplevel() {
 fn parse_toplevel_import(i: &str) -> ParserResult<ast::TopLevelExpr> {
     let (i, _) = tag("import")(i)?;
     let (i, _) = space(i)?;
-    let (i, import) = string(i)?;
+    let (i, import) = raw_string(i)?;
     Ok((i, ast::TopLevelExpr::Import(import)))
 }
 
@@ -176,7 +198,7 @@ fn test_parse_toplevel_constant() {
             "",
             ast::TopLevelExpr::Constant(ast::Constant {
                 name: ast::Ident("xx"),
-                value: ast::RightHandSide::Text("42")
+                value: ast::RightHandSide::Text(ast::Text::Simple("42"))
             })
         ))
     );
@@ -214,10 +236,15 @@ fn test_parse_toplevel_task() {
             ast::TopLevelExpr::Task(ast::Task {
                 name: ast::Ident("xalala"),
                 statements: vec![
-                    ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y")),
+                    ast::Statement::Assignment(
+                        ast::Ident("x"),
+                        ast::RightHandSide::Text(ast::Text::Simple("y"))
+                    ),
                     ast::Statement::Call(ast::Call {
                         callee: ast::Ident("print"),
-                        args: ast::Args::Simple(ast::RightHandSide::Text("xalalo"))
+                        args: ast::Args::Simple(ast::RightHandSide::Text(ast::Text::Simple(
+                            "xalalo"
+                        )))
                     })
                 ]
             })
@@ -241,21 +268,30 @@ fn test_parse_task_statement() {
         parse_task_statement("  x = \"y\"", "  "),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
+            ast::Statement::Assignment(
+                ast::Ident("x"),
+                ast::RightHandSide::Text(ast::Text::Simple("y"))
+            )
         ))
     );
     assert_eq!(
         parse_task_statement("\tx = \"y\"", "\t"),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
+            ast::Statement::Assignment(
+                ast::Ident("x"),
+                ast::RightHandSide::Text(ast::Text::Simple("y"))
+            )
         ))
     );
     assert_eq!(
         parse_task_statement("\tx = \"y\"\n", "\t"),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
+            ast::Statement::Assignment(
+                ast::Ident("x"),
+                ast::RightHandSide::Text(ast::Text::Simple("y"))
+            )
         ))
     );
 }
@@ -275,21 +311,30 @@ fn test_parse_task_statement_assignment() {
         parse_task_statement_assignment("x = \"y\""),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
+            ast::Statement::Assignment(
+                ast::Ident("x"),
+                ast::RightHandSide::Text(ast::Text::Simple("y"))
+            )
         ))
     );
     assert_eq!(
         parse_task_statement_assignment("x  = \t \"y\""),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
+            ast::Statement::Assignment(
+                ast::Ident("x"),
+                ast::RightHandSide::Text(ast::Text::Simple("y"))
+            )
         ))
     );
     assert_eq!(
         parse_task_statement_assignment("x=\"y\""),
         Ok((
             "",
-            ast::Statement::Assignment(ast::Ident("x"), ast::RightHandSide::Text("y"))
+            ast::Statement::Assignment(
+                ast::Ident("x"),
+                ast::RightHandSide::Text(ast::Text::Simple("y"))
+            )
         ))
     );
     assert_eq!(
@@ -300,7 +345,7 @@ fn test_parse_task_statement_assignment() {
                 ast::Ident("x"),
                 ast::RightHandSide::Call(Box::new(ast::Call {
                     callee: ast::Ident("fn"),
-                    args: ast::Args::Simple(ast::RightHandSide::Text("y"))
+                    args: ast::Args::Simple(ast::RightHandSide::Text(ast::Text::Simple("y")))
                 }))
             )
         ))
@@ -334,7 +379,7 @@ fn test_parse_call() {
             "",
             ast::Call {
                 callee: ast::Ident("print"),
-                args: ast::Args::Simple(ast::RightHandSide::Text("xalala"))
+                args: ast::Args::Simple(ast::RightHandSide::Text(ast::Text::Simple("xalala")))
             }
         ))
     );
@@ -346,7 +391,7 @@ fn test_parse_call() {
                 callee: ast::Ident("print"),
                 args: ast::Args::Named(vec![ast::Arg {
                     name: ast::Ident("arg"),
-                    value: ast::RightHandSide::Text("xalala")
+                    value: ast::RightHandSide::Text(ast::Text::Simple("xalala"))
                 }])
             }
         ))
@@ -387,7 +432,7 @@ fn test_parse_call() {
                     },
                     ast::Arg {
                         name: ast::Ident("arg2"),
-                        value: ast::RightHandSide::Text("xalala")
+                        value: ast::RightHandSide::Text(ast::Text::Simple("xalala"))
                     }
                 ])
             }
@@ -408,7 +453,10 @@ fn test_parse_call_simple_args() {
     );
     assert_eq!(
         parse_call_simple_args("\"value\""),
-        Ok(("", ast::Args::Simple(ast::RightHandSide::Text("value"))))
+        Ok((
+            "",
+            ast::Args::Simple(ast::RightHandSide::Text(ast::Text::Simple("value")))
+        ))
     );
 }
 
@@ -428,7 +476,7 @@ fn test_parse_call_named_args() {
             "",
             ast::Args::Named(vec![ast::Arg {
                 name: ast::Ident("arg"),
-                value: ast::RightHandSide::Text("value")
+                value: ast::RightHandSide::Text(ast::Text::Simple("value"))
             }])
         ))
     );
@@ -438,7 +486,7 @@ fn test_parse_call_named_args() {
             "",
             ast::Args::Named(vec![ast::Arg {
                 name: ast::Ident("arg"),
-                value: ast::RightHandSide::Text("value")
+                value: ast::RightHandSide::Text(ast::Text::Simple("value"))
             }])
         ))
     );
@@ -449,11 +497,11 @@ fn test_parse_call_named_args() {
             ast::Args::Named(vec![
                 ast::Arg {
                     name: ast::Ident("arg1"),
-                    value: ast::RightHandSide::Text("value1")
+                    value: ast::RightHandSide::Text(ast::Text::Simple("value1"))
                 },
                 ast::Arg {
                     name: ast::Ident("arg2"),
-                    value: ast::RightHandSide::Text("value2")
+                    value: ast::RightHandSide::Text(ast::Text::Simple("value2"))
                 }
             ])
         ))
@@ -476,7 +524,7 @@ fn test_parse_call_named_args_arg() {
             "",
             ast::Arg {
                 name: ast::Ident("arg"),
-                value: ast::RightHandSide::Text("value")
+                value: ast::RightHandSide::Text(ast::Text::Simple("value"))
             }
         ))
     );
@@ -486,7 +534,7 @@ fn test_parse_call_named_args_arg() {
             "",
             ast::Arg {
                 name: ast::Ident("arg"),
-                value: ast::RightHandSide::Text("value")
+                value: ast::RightHandSide::Text(ast::Text::Simple("value"))
             }
         ))
     );
@@ -560,17 +608,160 @@ fn test_ident() {
     );
 }
 
-fn string(i: &str) -> ParserResult<&str> {
-    let esc = escaped(none_of("\\\""), '\\', tag("\""));
-    let esc_or_empty = alt((esc, tag("")));
-    delimited(tag("\""), esc_or_empty, tag("\""))(i)
+fn raw_string(i: &str) -> ParserResult<&str> {
+    let escaped = escaped(none_of("\\\""), '\\', tag("\""));
+    delimited(tag("\""), alt((escaped, tag(""))), tag("\""))(i)
+}
+
+fn string<'a>(i: &'a str) -> ParserResult<ast::Text<'a>> {
+    let special_characters = "\\\"#";
+    let quote = tag("\"");
+
+    let simple = map(
+        delimited(
+            &quote,
+            take_till(|c| special_characters.contains(c)),
+            &quote,
+        ),
+        ast::Text::Simple,
+    )(i);
+    if simple.is_ok() {
+        return simple;
+    }
+
+    let var = preceded(char('#'), delimited(char('{'), ident, char('}')));
+    let mut content = String::new();
+    let mut vars: BTreeSet<ast::InterpolationVar<'a>> = BTreeSet::new();
+
+    let (i, _) = quote(i)?;
+    let string_start = i;
+    let mut iprime = i;
+    let mut escape_delta = 0;
+    let (i, _) = loop {
+        let (i, s) = take_till(|c| special_characters.contains(c))(iprime)?;
+        content.push_str(s);
+        match i.chars().nth(0) {
+            Some('#') => {
+                let advance = if let Ok((i2, name)) = var(i) {
+                    let start = i.as_ptr() as usize - string_start.as_ptr() as usize - escape_delta;
+                    let end = i2.as_ptr() as usize - string_start.as_ptr() as usize - escape_delta;
+                    vars.insert(ast::InterpolationVar { name, start, end });
+                    end - start
+                } else {
+                    1
+                };
+                content.push_str(&i[0..advance]);
+                iprime = &i[advance..]
+            }
+            Some('\\') => match i.chars().nth(1) {
+                None => break Err(nom::Err::Incomplete(nom::Needed::Unknown)),
+                Some(c) => {
+                    content.push(c);
+                    escape_delta += 1;
+                    iprime = &i[2..];
+                }
+            },
+            Some('"') => break Ok((i, ())),
+            _ => break Err(nom::Err::Incomplete(nom::Needed::Unknown)),
+        }
+    }?;
+    let (i, _) = quote(i)?;
+
+    Ok((i, ast::Text::Complex(ast::Interpolation { content, vars })))
 }
 
 #[test]
 fn test_string() {
-    assert_eq!(string("\"42\""), Ok(("", "42")));
-    assert_eq!(string("\"xalala\""), Ok(("", "xalala")));
-    assert_eq!(string("\"xa la la\""), Ok(("", "xa la la")));
+    assert_eq!(string("\"xalala\""), Ok(("", ast::Text::Simple("xalala"))));
+    assert_eq!(
+        string("\"xa\\\"lala\""),
+        Ok((
+            "",
+            ast::Text::Complex(ast::Interpolation {
+                content: "xa\"lala".to_string(),
+                vars: btreeset![]
+            })
+        ))
+    );
+    assert_eq!(
+        string("\"xa#lala\""),
+        Ok((
+            "",
+            ast::Text::Complex(ast::Interpolation {
+                content: "xa#lala".to_string(),
+                vars: btreeset![]
+            })
+        ))
+    );
+    assert_eq!(
+        string("\"xa\\#lala\""),
+        Ok((
+            "",
+            ast::Text::Complex(ast::Interpolation {
+                content: "xa#lala".to_string(),
+                vars: btreeset![]
+            })
+        ))
+    );
+    assert_eq!(
+        string("\"xa#{la}la\""),
+        Ok((
+            "",
+            ast::Text::Complex(ast::Interpolation {
+                content: "xa#{la}la".to_string(),
+                vars: btreeset![ast::InterpolationVar {
+                    name: ast::Ident("la"),
+                    start: 2,
+                    end: 7
+                }]
+            })
+        ))
+    );
+    assert_eq!(
+        string("\"xa #{la} #{la} xa\""),
+        Ok((
+            "",
+            ast::Text::Complex(ast::Interpolation {
+                content: "xa #{la} #{la} xa".to_string(),
+                vars: btreeset![
+                    ast::InterpolationVar {
+                        name: ast::Ident("la"),
+                        start: 3,
+                        end: 8
+                    },
+                    ast::InterpolationVar {
+                        name: ast::Ident("la"),
+                        start: 9,
+                        end: 14
+                    },
+                ]
+            })
+        ))
+    );
+    assert_eq!(
+        string(r#""xa\"la\"la""#),
+        Ok((
+            "",
+            ast::Text::Complex(ast::Interpolation {
+                content: "xa\"la\"la".to_string(),
+                vars: btreeset![]
+            })
+        ))
+    );
+    assert_eq!(
+        string("\"xa \\\"#{la}\\\" xa\""),
+        Ok((
+            "",
+            ast::Text::Complex(ast::Interpolation {
+                content: "xa \"#{la}\" xa".to_string(),
+                vars: btreeset![ast::InterpolationVar {
+                    name: ast::Ident("la"),
+                    start: 4,
+                    end: 9
+                }]
+            })
+        ))
+    );
 }
 
 fn number(i: &str) -> ParserResult<ast::RightHandSide> {
@@ -587,17 +778,14 @@ fn test_number() {
     );
 }
 
-fn value(i: &str) -> ParserResult<ast::RightHandSide> {
-    let string_parser = map(string, ast::RightHandSide::Text);
-    alt((complete(string_parser), complete(number)))(i)
-}
-
 fn right_hand_side(i: &str) -> ParserResult<ast::RightHandSide> {
     let ident_parser = map(ident, ast::RightHandSide::Reference);
     let call_parser = map(parse_call, |call| ast::RightHandSide::Call(Box::new(call)));
+    let string_parser = map(string, ast::RightHandSide::Text);
+    let value_parser = alt((complete(string_parser), complete(number)));
     alt((
         complete(call_parser),
         complete(ident_parser),
-        complete(value),
+        complete(value_parser),
     ))(i)
 }

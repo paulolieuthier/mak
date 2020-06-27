@@ -134,7 +134,36 @@ impl<'a> Interpreter<'a> {
         value: &ast::RightHandSide<'a>,
     ) -> Result<Value<'a>, String> {
         match value {
-            ast::RightHandSide::Text(text) => Ok(Value::from_text(*text)),
+            ast::RightHandSide::Text(text) => match &text {
+                ast::Text::Simple(text) => Ok(Value::from_text(*text)),
+                ast::Text::Complex(ast::Interpolation { content, vars }) => {
+                    let var_and_values = vars
+                        .iter()
+                        .map(|var| {
+                            let ast::Ident(ident) = var.name;
+                            self.lookup_reference(context, ident)
+                                .map(|value| (var, value))
+                                .ok_or(format!("Can't handle value: {}", ident))
+                        })
+                        .collect::<Result<Vec<(&ast::InterpolationVar<'a>, Value<'a>)>, String>>(
+                        )?;
+
+                    // replace variables in string using ranges from parser
+                    // as ranges appear in order and don't overlap, it's safe to use the accumulated delta got from replacing variables by values of different length
+                    let mut content = content.clone();
+                    let mut shift = 0i32;
+                    for (var, value) in var_and_values {
+                        let range_len = var.end as i32 - var.start as i32;
+                        let value = &format!("{}", value)[..];
+                        content.replace_range(
+                            (var.start as i32 + shift) as usize..(var.end as i32 + shift) as usize,
+                            value,
+                        );
+                        shift = shift + value.len() as i32 - range_len;
+                    }
+                    Ok(Value::from_text(content))
+                }
+            },
             ast::RightHandSide::Number(number) => Ok(Value::from_number(*number)),
             ast::RightHandSide::Reference(ast::Ident(ident)) => self
                 .lookup_reference(context, ident)
